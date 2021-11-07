@@ -13,5 +13,4 @@ const ROOMS = [
   { id: 106, status: 1 },
 ];
 
-
-export {PLAY_MODE, ROOMS}
+export { PLAY_MODE, ROOMS };

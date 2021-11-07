@@ -1,20 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { gameSubject, initGame, resetGame } from './Game';
-import { Drawer, Modal, Button, Radio, message } from 'antd';
+import { Drawer, Modal, Button, Radio, message, Select } from 'antd';
 import { ROOMS, PLAY_MODE } from './Constant';
 
 import Rooms from './Rooms';
-import Board from './Board';
+import ToolBoard from './ToolBoard';
+
 import io from 'socket.io-client';
+import $ from 'jquery';
 
 import '../scss/App.css';
 import 'antd/dist/antd.css';
 
+const { Option } = Select;
+const socket = io.connect('http://localhost:4000');
+
 function App() {
-  const [board, setBoard] = useState([]);
-  const [isGameOver, setIsGameOver] = useState();
-  const [result, setResult] = useState();
-  const [turn, setTurn] = useState();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(true);
   const [playMode, setPlayMode] = useState(PLAY_MODE.PVSF);
@@ -23,23 +23,12 @@ function App() {
   const socketRef = useRef();
 
   useEffect(() => {
-    initGame();
-    const subscribe = gameSubject.subscribe((game) => {
-      setBoard(game.board);
-      setIsGameOver(game.isGameOver);
-      setResult(game.result);
-      setTurn(game.turn);
-    });
-    return () => subscribe.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    socketRef.current = io.connect('http://localhost:4000');
-    socketRef.current.on('gameObject', (gameObject) => {
-      setBoard(gameObject);
-    });
-    return () => socketRef.current.disconnect();
-  }, [board]);
+    // socketRef.current = io.connect('http://localhost:4000');
+    // socketRef.current.on('message', (message) => {
+    //   console.log(message);
+    // });
+    // return () => socketRef.current.disconnect();
+  });
 
   const renderDrawer = () => {
     return (
@@ -50,6 +39,7 @@ function App() {
         closable={true}
         onClose={() => {
           setDrawerVisible(false);
+          setPlayMode(PLAY_MODE.PVSF);
         }}
         visible={drawerVisible}
         key={'right'}
@@ -74,53 +64,51 @@ function App() {
     return (
       <Modal
         visible={modalVisible}
-        title="Chess"
-        onOk={() => {}}
-        onCancel={() => {
-          setModalVisible(false);
-        }}
+        title="Chọn chế độ chơi"
         className="chess-modal"
+        closable={false}
+        keyboard={true}
         footer={[
-          <Button
-            key="back"
-            className="chess-button-type-1"
-            onClick={() => {
-              setModalVisible(false);
-            }}
-          >
-            Hủy
-          </Button>,
           <Button
             key="submit"
             type="primary"
             className="chess-button"
             disabled={playMode === PLAY_MODE.PVSP && !roomConnected}
-            onClick={() => {
-              setModalVisible(false);
-            }}
+            onClick={onPlay}
           >
             Chơi
           </Button>,
         ]}
       >
-        <p>Chế độ chơi:</p>
         {renderRadioButtons()}
       </Modal>
     );
   };
 
+  const renderToolBoard = () => {
+    return <ToolBoard />;
+  };
+
   const renderRadioButtons = () => {
     return (
       <Radio.Group
-        onChange={(res) => {
-          setPlayMode(res?.target?.value);
-        }}
+        onChange={handleChangePlayMode}
         name="radiogroup"
         defaultValue={playMode}
+        value={playMode}
       >
         <Radio value={PLAY_MODE.PVSF}>Chơi 2 người</Radio>
         <br />
         <Radio value={PLAY_MODE.PVSE}>Chơi với máy</Radio>
+        {playMode === PLAY_MODE.PVSE ? (
+          <Select defaultValue="3" style={{ width: 120 }}>
+            <Option value="1">1</Option>
+            <Option value="2">2</Option>
+            <Option value="3">3</Option>
+            <Option value="4">4</Option>
+            <Option value="5">5</Option>
+          </Select>
+        ) : null}
         <br />
         <Radio
           onClick={() => {
@@ -134,22 +122,19 @@ function App() {
     );
   };
 
+  const handleChangePlayMode = (res) => {
+    setPlayMode(res?.target?.value);
+  };
+
+  const onPlay = () => {
+    setModalVisible(false);
+    // socket.emit('message', { name: 'test', message: 'test' });
+    $('#play-mode').attr('mode', playMode);
+  };
+
   return (
     <>
-      <div className="container">
-        {isGameOver && (
-          <h2 className="vertical-text">
-            GAME OVER
-            <button onClick={resetGame}>
-              <span className="vertical-text"> NEW GAME</span>
-            </button>
-          </h2>
-        )}
-        <div className="board-container">
-          <Board board={board} turn={turn} />
-        </div>
-        {result && <p className="vertical-text">{result}</p>}
-      </div>
+      {renderToolBoard()}
       {renderDrawer()}
       {renderModal()}
     </>
