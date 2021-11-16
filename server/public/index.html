@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Libraly -->
+    <!-- Common -->
+    <link
+      rel="stylesheet"
+      href="./assets/lib/chessboardjs/css/chessboard-0.3.0.css"
+    />
+    <link rel="stylesheet" href="./assets/css/style.css" />
+    <!-- Individual -->
+
+    <title>Chess App</title>
+  </head>
+  <body>
+    <!-- board -->
+    <div id="board" class="board"></div>
+
+    <!-- info game -->
+    <div class="info">
+      Search depth:
+      <select id="search-depth">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+
+      <br />
+      <span>Positions evaluated: <span id="position-count"></span></span>
+      <br />
+      <span>Time: <span id="time"></span></span>
+      <br />
+      <span>Positions/s: <span id="positions-per-s"></span> </span>
+      <br />
+      <br />
+      <div id="move-history" class="move-history"></div>
+      <div id="play-mode"></div>
+    </div>
+
+    <!-- Library -->
+    <script src="./assets/lib/jquery/jquery-3.2.1.min.js"></script>
+    <script src="http://localhost:8000/socket.io/socket.io.js"></script>
+
+    <!-- Common -->
+    <script src="./assets/lib/chessboardjs/js/chess.js"></script>
+    <script src="./assets/lib/chessboardjs/js/chessboard-0.3.0.js"></script>
+
+    <!-- Individual -->
+    <script src="./scripts/script.js"></script>
+  </body>
+</html>
