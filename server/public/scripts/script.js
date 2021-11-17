@@ -1,15 +1,85 @@
-const socket = io();
-socket.on('message', (messgae) => {
-  alert(messgae);
+var board,
+  game = new Chess(),
+  turn = 'w',
+  socket = io();
+
+function alert({ message, type }) {
+  let me = $('.alert');
+
+  me.text(message);
+  me.addClass(`alert-${type}`);
+  me.fadeTo(2000, 500).slideUp(500, function () {
+    me.slideUp(500);
+    me.removeClass(`alert-${type}`);
+  });
+}
+
+function waitingScreen(status) {
+  if (status) {
+    $('.backdrop').remove('.backdrop');
+    $('body').prepend(
+      `<div class="backdrop"><h1>Đang chờ đối thủ...</h1></div>`
+    );
+  } else {
+    $('.backdrop').remove('.backdrop');
+  }
+}
+
+const { firstname, roomid, gamemode } = Qs.parse(location.search, {
+  ignoreQueryPrefix: true,
 });
+
+if (gamemode == constant.GAME_MODE.PVF) {
+  waitingScreen(true);
+}
+
+socket.emit('join', { firstname, roomid });
+
+socket.on('turn', (_turn) => {
+  turn = _turn;
+});
+
+socket.on('guestInfo', (data) => {
+  const { turn: _turn, name, room } = data;
+  if (room.length >= 2) waitingScreen();
+  console.log(data);
+  if (name == firstname) {
+    turn = _turn;
+  } else {
+    turn = _turn == 'w' ? 'b' : 'w';
+  }
+  // $('.badge-white-player').text(room?.[0]?.name || 'Chử phòng');
+  // $('.badge-black-player').text(room?.[1].name || 'Chờ người chơi...');
+});
+
+socket.on('message', (message, disconnect) => {
+  alert({ message, type: 'primary' });
+  waitingScreen();
+  if (disconnect) {
+    game = new Chess();
+    board.position(game.fen());
+  }
+});
+
+socket.on('movingData', (fen) => {
+  game = new Chess(fen);
+  board.position(fen);
+});
+
+if (gamemode == constant.GAME_MODE.PVE) {
+  $('.badge-white-player').text('Bạn');
+  $('.badge-black-player').text('Máy');
+}
+
+if (gamemode == constant.GAME_MODE.PVP) {
+  $('.badge-white-player').text('Người chơi 1');
+  $('.badge-black-player').text('Người chơi 2');
+}
 
 var PLAY_MODE = {
   PVSP: 0,
   PVSE: 1,
 };
-
-var board,
-  game = new Chess();
 
 /*The "AI" part starts here */
 
@@ -188,25 +258,29 @@ var getPieceValue = function (piece, x, y) {
 /* board visualization and games state handling */
 
 var onDragStart = function (source, piece, position, orientation) {
-  console.log(game.turn());
-  let mode = $('#play-mode').attr('mode');
+  if (gamemode == constant.GAME_MODE.PVF && turn !== game.turn()) return false;
+
   if (
     game.in_checkmate() === true ||
     game.in_draw() === true ||
-    (mode == 2 && piece.search(/^b/) !== -1)
+    (gamemode == constant.GAME_MODE.PVE && piece.search(/^b/) !== -1)
   ) {
     return false;
   }
 };
 
 var makeBestMove = function () {
-  let mode = $('#play-mode').attr('mode');
-  if (mode == 2) {
+  if (gamemode == constant.GAME_MODE.PVE) {
     var bestMove = getBestMove(game);
     game.ugly_move(bestMove);
   }
 
   board.position(game.fen());
+
+  if (gamemode == constant.GAME_MODE.PVF) {
+    socket.emit('moving', game.fen());
+  }
+
   renderMoveHistory(game.history());
   if (game.game_over()) {
     alert('Game over');
@@ -290,6 +364,8 @@ var onSnapEnd = function () {
  * @param {*} piece
  */
 var onMouseoverSquare = function (square, piece) {
+  if (gamemode == constant.GAME_MODE.PVF && turn !== game.turn()) return;
+
   //Danh sách các nước có thể đi tiếp theo VD: ['e4', 'e5']
   var moves = game.moves({
     square: square,

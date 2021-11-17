@@ -1,0 +1,39 @@
+.hide {
+  display: none;
+}
+
+.show {
+  display: block;
+}
+
+.alert-fixed {
+  text-align: center;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  z-index: 9999;
+  border-radius: 0px;
+}
+
+.progress-bar {
+  background-color: #d18b47;
+}
+
+.progress {
+  height: 0.7rem;
+}
+
+.backdrop {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  z-index: 9999;
+  position: fixed;
+  background: rgba(0, 0, 0, 0.8);
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+}
