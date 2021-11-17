@@ -1,6 +1,7 @@
 var board,
   game = new Chess(),
-  turn = 'w',
+  turn = 'b',
+  _depth = 3,
   socket = io();
 
 function alert({ message, type }) {
@@ -29,32 +30,30 @@ const { firstname, roomid, gamemode } = Qs.parse(location.search, {
   ignoreQueryPrefix: true,
 });
 
-if (gamemode == constant.GAME_MODE.PVF) {
-  waitingScreen(true);
-}
+const callBack = ({ error }) => {
+  if (error) {
+    setTimeout(() => {
+      // location.href = '/';
+    }, 0);
+    console.log(error);
+  }
+};
 
-socket.emit('join', { firstname, roomid });
+socket.emit('join', { firstname, roomid }, callBack);
 
-socket.on('turn', (_turn) => {
-  turn = _turn;
+socket.on('init', ({ isWaiting, users }) => {
+  waitingScreen(isWaiting);
+  $('.badge-black-player').text(users?.w || 'Unknown');
+  $('.badge-white-player').text(users?.b || 'Unknown');
 });
 
-socket.on('guestInfo', (data) => {
-  const { turn: _turn, name, room } = data;
-  if (room.length >= 2) waitingScreen();
-  console.log(data);
-  if (name == firstname) {
-    turn = _turn;
-  } else {
-    turn = _turn == 'w' ? 'b' : 'w';
-  }
-  // $('.badge-white-player').text(room?.[0]?.name || 'Chử phòng');
-  // $('.badge-black-player').text(room?.[1].name || 'Chờ người chơi...');
+socket.on('turn', (data) => {
+  turn = data;
+  console.log(turn);
 });
 
 socket.on('message', (message, disconnect) => {
   alert({ message, type: 'primary' });
-  waitingScreen();
   if (disconnect) {
     game = new Chess();
     board.position(game.fen());
@@ -67,6 +66,7 @@ socket.on('movingData', (fen) => {
 });
 
 if (gamemode == constant.GAME_MODE.PVE) {
+  $('.bi.bi-gear').show();
   $('.badge-white-player').text('Bạn');
   $('.badge-black-player').text('Máy');
 }
@@ -74,6 +74,10 @@ if (gamemode == constant.GAME_MODE.PVE) {
 if (gamemode == constant.GAME_MODE.PVP) {
   $('.badge-white-player').text('Người chơi 1');
   $('.badge-black-player').text('Người chơi 2');
+}
+
+if (gamemode == constant.GAME_MODE.PVF) {
+  $('#btn-draw').show();
 }
 
 var PLAY_MODE = {
@@ -283,18 +287,18 @@ var makeBestMove = function () {
 
   renderMoveHistory(game.history());
   if (game.game_over()) {
-    alert('Game over');
+    alert({ message: 'Game over' });
   }
 };
 
 var positionCount;
 var getBestMove = function (game) {
   if (game.game_over()) {
-    alert('Game over');
+    alert({ message: 'Game over' });
   }
 
   positionCount = 0;
-  var depth = parseInt($('#search-depth').find(':selected').text());
+  var depth = _depth;
 
   var d = new Date().getTime();
   var d2 = new Date().getTime();
@@ -411,6 +415,85 @@ var greySquare = function (square) {
 
   squareEl.css('background', background);
 };
+
+var dropdownSelect = (root, child) => {
+  let me = $(root);
+  me.find('.dropdown-item').removeClass('selected');
+  $(child).addClass('selected');
+};
+
+dropdownSelect('.m-dropdown', '[selected]');
+
+$('.m-dropdown .dropdown-item').on('click', function () {
+  let me = $(this),
+    value = me.attr('value');
+  _depth = value;
+  dropdownSelect('.m-dropdown', me);
+  $('.m-dropdown').hide();
+});
+
+$('.bi.bi-gear').hover(
+  function () {
+    $('.m-dropdown').show();
+  },
+  function () {
+    $('.m-dropdown').mouseleave(function () {
+      $('.m-dropdown').hide();
+    });
+  }
+);
+
+$('#btn-draw').on('click', function () {
+  socket.emit('opponentDraw', { type: turn, name: firstname });
+});
+
+socket.on('opponentDrawReq', ({ type, name }) => {
+  if (type == 'w') {
+    makeDraw('.b-draw-area', { name });
+  } else {
+    makeDraw('.w-draw-area', { name });
+  }
+});
+
+const makeDraw = (root, { name = '', show = true }) => {
+  let me = $(root),
+    _html = ` <div class="player-turn position-relative">
+  <span class="badge bg-dark p-2 position-absolute bg-draw">
+    Người chơi ${name} muốn xin hòa
+    <button data-yes="true"  class="m-button ml-2">Có</button>
+    <button data-yes="false"  class="m-button ml-2">Hủy</button>
+  </span>
+</div>`;
+
+  me.html('');
+  if (show) {
+    me.html(_html);
+  }
+};
+
+$(document).on('click', '.bg-draw button', function () {
+  let me = $(this),
+    type = me.data('yes');
+
+  if (type == true) {
+    socket.emit('messageReceived', { message: 'HÒA', type: 'all' });
+  } else {
+    socket.emit('messageReceived', {
+      message: 'Đối  thủ không đồng ý hòa',
+      type: 'notall',
+    });
+  }
+  makeDraw('.b-draw-area', { show: false });
+  makeDraw('.w-draw-area', { show: false });
+});
+
+var tooltipTriggerList = [].slice.call(
+  document.querySelectorAll('[data-bs-toggle="tooltip"]')
+);
+
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl);
+});
 
 var cfg = {
   draggable: true,

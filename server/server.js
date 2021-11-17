@@ -2,6 +2,12 @@ const path = require('path');
 const http = require('http');
 const express = require('express');
 const socketio = require('socket.io');
+const {
+  addUser,
+  removeUser,
+  getUser,
+  getUsersInRoom,
+} = require('./public/scripts/user');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,46 +21,53 @@ app.use(express.static(publicDirectoryPath));
 const rooms = {};
 
 io.on('connection', (socket) => {
-  socket.on('join', ({ firstname, roomid }) => {
-    //format data
-    roomid = roomid?.trim()?.toLowerCase();
-    firstname = firstname?.trim()?.toLowerCase();
-
-    //check is creator
-    if (
-      !rooms[roomid] ||
-      !Array.isArray(rooms[roomid]) ||
-      rooms[roomid]?.length === 0
-    ) {
-      rooms[roomid] = [];
-    }
-
-    if (rooms[roomid]?.length >= 2) return;
-
-    rooms[roomid].push({ id: socket.id, name: firstname });
-
+  socket.on('join', ({ firstname, roomid }, callback) => {
     //create room
     socket.join(roomid);
 
-    const isCreator = rooms[roomid]?.[0]?.id == socket.id;
-
-    socket.emit('turn', isCreator ? 'w' : 'b');
-
-    io.in(roomid).emit('guestInfo', {
-      name: firstname,
-      turn: isCreator ? 'w' : 'b',
-      room: rooms[roomid],
+    const { user, error } = addUser({
+      id: socket.id,
+      username: firstname,
+      room: roomid,
     });
+
+    if (error) {
+      return callback({ error });
+    }
+
+    const users = getUsersInRoom(roomid);
+
+    io.in(roomid).emit('init', {
+      isWaiting: users.length < 2,
+      users: {
+        w: users[0]?.username ?? 'Người chơi',
+        b: users[1]?.username ?? 'Người chơi',
+      },
+    });
+
+    socket.broadcast.to(roomid).emit('turn', 'w');
 
     socket.broadcast
       .to(roomid)
-      .emit('message', `${firstname} đã tham gia phòng!`, 'reconnect');
+      .emit('message', `${firstname} đã tham gia phòng.`, 'reconnect');
+
+    socket.to(roomid).on('messageReceived', ({ type, message }) => {
+      if (type == 'all') io.in(roomid).emit('message', message, 'reconnect');
+      else {
+        socket.broadcast.to(roomid).emit('message', message);
+      }
+    });
+
+    socket.to(roomid).on('opponentDraw', (data) => {
+      socket.broadcast.emit('opponentDrawReq', data);
+    });
 
     socket.to(roomid).on('disconnect', () => {
-      io.emit('message', `${firstname} đã rời phòng!`, 'disconnect');
-      rooms[roomid] = [...rooms[roomid].filter((user) => user.id != socket.id)];
-      console.log('leaving', rooms[roomid]);
-      if (rooms[roomid].length === 0) delete rooms[roomid];
+      io.in(roomid).emit('message', `${firstname} đã rời phòng.`, 'disconnect');
+      removeUser(socket.id);
+      io.in(roomid).emit('init', {
+        isWaiting: getUsersInRoom(roomid).length < 2,
+      });
     });
 
     socket.to(roomid).on('moving', (board) => {
